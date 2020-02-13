@@ -7,3 +7,6 @@
 [submodule "user/plugins/import-export"]
 	path = user/plugins/import-export
 	url = https://github.com/GautamGupta/YOURLS-Import-Export.git
+[submodule "user/plugins/redirect-index"]
+	path = user/plugins/redirect-index
+	url = https://github.com/tomslominski/yourls-redirect-index.git
