@@ -1,0 +1,12 @@
+[submodule "user/plugins/force-lowercase"]
+	path = user/plugins/force-lowercase
+	url = https://github.com/YOURLS/force-lowercase.git
+[submodule "user/plugins/302-instead"]
+	path = user/plugins/302-instead
+	url = https://github.com/timcrockford/302-instead.git
+[submodule "user/plugins/import-export"]
+	path = user/plugins/import-export
+	url = https://github.com/GautamGupta/YOURLS-Import-Export.git
+[submodule "user/plugins/redirect-index"]
+	path = user/plugins/redirect-index
+	url = https://github.com/tomslominski/yourls-redirect-index.git
