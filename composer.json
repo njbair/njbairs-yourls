@@ -2,7 +2,7 @@
     "name": "gracechurchmentor/gcm-yourls",
     "type": "project",
     "require": {
-        "vlucas/phpdotenv": "^4.1"
+        "vlucas/phpdotenv": "^5.4"
     },
     "authors": [
         {
