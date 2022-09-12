@@ -7,15 +7,18 @@
 /**
  * Convert an integer (1337) to a string (3jk).
  *
+ * @param int $num       Number to convert
+ * @param string $chars  Characters to use for conversion
+ * @return string        Converted number
  */
-function yourls_int2string( $num, $chars = null ) {
+function yourls_int2string($num, $chars = null) {
 	if( $chars == null )
 		$chars = yourls_get_shorturl_charset();
 	$string = '';
 	$len = strlen( $chars );
 	while( $num >= $len ) {
-		$mod = bcmod( $num, $len );
-		$num = bcdiv( $num, $len );
+		$mod = bcmod( (string)$num, (string)$len );
+		$num = bcdiv( (string)$num, (string)$len );
 		$string = $chars[ $mod ] . $string;
 	}
 	$string = $chars[ intval( $num ) ] . $string;
@@ -26,8 +29,11 @@ function yourls_int2string( $num, $chars = null ) {
 /**
  * Convert a string (3jk) to an integer (1337)
  *
+ * @param string $string  String to convert
+ * @param string $chars   Characters to use for conversion
+ * @return string         Number (as a string)
  */
-function yourls_string2int( $string, $chars = null ) {
+function yourls_string2int($string, $chars = null) {
 	if( $chars == null )
 		$chars = yourls_get_shorturl_charset();
 	$integer = 0;
@@ -36,38 +42,47 @@ function yourls_string2int( $string, $chars = null ) {
 	$inputlen = strlen( $string );
 	for ($i = 0; $i < $inputlen; $i++) {
 		$index = strpos( $chars, $string[$i] );
-		$integer = bcadd( $integer, bcmul( $index, bcpow( $baselen, $i ) ) );
+		$integer = bcadd( (string)$integer, bcmul( (string)$index, bcpow( (string)$baselen, (string)$i ) ) );
 	}
 
 	return yourls_apply_filter( 'string2int', $integer, $string, $chars );
 }
 
 /**
- * Return a unique(ish) hash for a string to be used as a valid HTML id
+ * Return a unique string to be used as a valid HTML id
  *
+ * @since   1.8.3
+ * @param  string $prefix   Optional prefix
+ * @return string           The unique string
  */
-function yourls_string2htmlid( $string ) {
-	return yourls_apply_filter( 'string2htmlid', 'y'.abs( crc32( $string ) ) );
+function yourls_unique_element_id($prefix = 'yid') {
+    static $id_counter = 0;
+	return yourls_apply_filter( 'unique_element_id', $prefix . (string)++$id_counter );
 }
 
 /**
- * Make sure a link keyword (ie "1fv" as in "http://sho.rt/1fv") is valid.
+ * Make sure a link keyword (ie "1fv" as in "http://sho.rt/1fv") is acceptable
  *
- */
-function yourls_sanitize_string( $string ) {
-	// make a regexp pattern with the shorturl charset, and remove everything but this
-	$pattern = yourls_make_regexp_pattern( yourls_get_shorturl_charset() );
-	$valid = (string) substr( preg_replace( '![^'.$pattern.']!', '', $string ), 0, 199 );
-
-	return yourls_apply_filter( 'sanitize_string', $valid, $string );
-}
-
-/**
- * Alias function. I was always getting it wrong.
+ * If we are ADDING or EDITING a short URL, the keyword must comply to the short URL charset: every
+ * character that doesn't belong to it will be removed.
+ * But otherwise we must have a more conservative approach: we could be checking for a keyword that
+ * was once valid but now the short URL charset has changed. In such a case, we are treating the keyword for what
+ * it is: just a part of a URL, hence sanitize it as a URL.
  *
+ * @param  string $keyword                        short URL keyword
+ * @param  bool   $restrict_to_shorturl_charset   Optional, default false. True if we want the keyword to comply to short URL charset
+ * @return string                                 The sanitized keyword
  */
-function yourls_sanitize_keyword( $keyword ) {
-	return yourls_sanitize_string( $keyword );
+function yourls_sanitize_keyword( $keyword, $restrict_to_shorturl_charset = false ) {
+    if( $restrict_to_shorturl_charset === true ) {
+        // make a regexp pattern with the shorturl charset, and remove everything but this
+        $pattern = yourls_make_regexp_pattern( yourls_get_shorturl_charset() );
+        $valid = (string) substr( preg_replace( '![^'.$pattern.']!', '', $keyword ), 0, 199 );
+    } else {
+        $valid = yourls_sanitize_url( $keyword );
+    }
+
+	return yourls_apply_filter( 'sanitize_string', $valid, $keyword, $restrict_to_shorturl_charset );
 }
 
 /**
@@ -129,8 +144,11 @@ function yourls_sanitize_url_safe( $unsafe_url, $protocols = array() ) {
  *
  * Stolen from WP's _deep_replace
  *
+ * @param string|array $search   Needle, or array of needles.
+ * @param string       $subject  Haystack.
+ * @return string                The string with the replaced values.
  */
-function yourls_deep_replace( $search, $subject ){
+function yourls_deep_replace($search, $subject ){
 	$found = true;
 	while($found) {
 		$found = false;
@@ -148,24 +166,31 @@ function yourls_deep_replace( $search, $subject ){
 /**
  * Make sure an integer is a valid integer (PHP's intval() limits to too small numbers)
  *
+ * @param int $int  Integer to check
+ * @return string   Integer as a string
  */
-function yourls_sanitize_int( $int ) {
+function yourls_sanitize_int($int ) {
 	return ( substr( preg_replace( '/[^0-9]/', '', strval( $int ) ), 0, 20 ) );
 }
 
 /**
  * Sanitize an IP address
+ * No check on validity, just return a sanitized string
  *
+ * @param string $ip  IP address
+ * @return string     IP address
  */
-function yourls_sanitize_ip( $ip ) {
+function yourls_sanitize_ip($ip ) {
 	return preg_replace( '/[^0-9a-fA-F:., ]/', '', $ip );
 }
 
 /**
  * Make sure a date is m(m)/d(d)/yyyy, return false otherwise
  *
+ * @param string $date  Date to check
+ * @return false|mixed  Date in format m(m)/d(d)/yyyy or false if invalid
  */
-function yourls_sanitize_date( $date ) {
+function yourls_sanitize_date($date ) {
 	if( !preg_match( '!^\d{1,2}/\d{1,2}/\d{4}$!' , $date ) ) {
 		return false;
 	}
@@ -175,18 +200,24 @@ function yourls_sanitize_date( $date ) {
 /**
  * Sanitize a date for SQL search. Return false if malformed input.
  *
+ * @param string $date   Date
+ * @return false|string  String in Y-m-d format for SQL search or false if malformed input
  */
-function yourls_sanitize_date_for_sql( $date ) {
+function yourls_sanitize_date_for_sql($date) {
 	if( !yourls_sanitize_date( $date ) )
 		return false;
 	return date( 'Y-m-d', strtotime( $date ) );
 }
 
 /**
- * Return trimmed string
+ * Return trimmed string, optionally append '[...]' if string is too long
  *
+ * @param string $string  String to trim
+ * @param int $length     Maximum length of string
+ * @param string $append  String to append if trimmed
+ * @return string         Trimmed string
  */
-function yourls_trim_long_string( $string, $length = 60, $append = '[...]' ) {
+function yourls_trim_long_string($string, $length = 60, $append = '[...]') {
 	$newstring = $string;
     if ( mb_strlen( $newstring ) > $length ) {
         $newstring = mb_substr( $newstring, 0, $length - mb_strlen( $append ), 'UTF-8' ) . $append;
@@ -215,8 +246,10 @@ function yourls_sanitize_version( $version ) {
 /**
  * Sanitize a filename (no Win32 stuff)
  *
+ * @param string $file  File name
+ * @return string|null  Sanitized file name (or null if it's just backslashes, ok...)
  */
-function yourls_sanitize_filename( $file ) {
+function yourls_sanitize_filename($file) {
 	$file = str_replace( '\\', '/', $file ); // sanitize for Win32 installs
 	$file = preg_replace( '|/+|' ,'/', $file ); // remove any duplicate slash
 	return $file;
@@ -225,8 +258,10 @@ function yourls_sanitize_filename( $file ) {
 /**
  * Check if a string seems to be UTF-8. Stolen from WP.
  *
+ * @param string $str  String to check
+ * @return bool        Whether string seems valid UTF-8
  */
-function yourls_seems_utf8( $str ) {
+function yourls_seems_utf8($str) {
 	$length = strlen( $str );
 	for ( $i=0; $i < $length; $i++ ) {
 		$c = ord( $str[ $i ] );
@@ -407,6 +442,8 @@ function yourls_specialchars_decode( $string, $quote_style = ENT_NOQUOTES ) {
 	$others = array( '&lt;'   => '<', '&#060;'  => '<', '&gt;'   => '>', '&#062;'  => '>', '&amp;'  => '&', '&#038;'  => '&', '&#x26;' => '&' );
 	$others_preg = array( '/&#0*60;/'  => '&#060;', '/&#0*62;/'  => '&#062;', '/&#0*38;/'  => '&#038;', '/&#x0*26;/i' => '&#x26;' );
 
+    $translation = $translation_preg = [];
+
 	if ( $quote_style === ENT_QUOTES ) {
 		$translation = array_merge( $single, $double, $others );
 		$translation_preg = array_merge( $single_preg, $double_preg, $others_preg );
@@ -487,14 +524,10 @@ function yourls_esc_url( $url, $context = 'display', $protocols = array() ) {
 	if ( '' == $url )
 		return $url;
 
-	// make sure there's a protocol, add http:// if not
-	if ( ! yourls_get_protocol( $url ) )
-		$url = 'http://'.$url;
-
 	$original_url = $url;
 
 	// force scheme and domain to lowercase - see issues 591 and 1630
-    $url = yourls_lowercase_scheme_domain( $url );
+    $url = yourls_normalize_uri( $url );
 
 	$url = preg_replace( '|[^a-z0-9-~+_.?#=!&;,/:%@$\|*\'()\[\]\\x80-\\xff]|i', '', $url );
 	// Previous regexp in YOURLS was '|[^a-z0-9-~+_.?\[\]\^#=!&;,/:%@$\|*`\'<>"()\\x80-\\xff\{\}]|i'
@@ -514,23 +547,29 @@ function yourls_esc_url( $url, $context = 'display', $protocols = array() ) {
 		$url = str_replace( "'", '&#039;', $url );
 	}
 
-	if ( ! is_array( $protocols ) or ! $protocols ) {
-		global $yourls_allowedprotocols;
-		$protocols = yourls_apply_filter( 'esc_url_protocols', $yourls_allowedprotocols );
-		// Note: $yourls_allowedprotocols is also globally filterable in functions-kses.php/yourls_kses_init()
-	}
+    // If there's a protocol, make sure it's OK
+    if( yourls_get_protocol($url) !== '' ) {
+        if ( ! is_array( $protocols ) or ! $protocols ) {
+            global $yourls_allowedprotocols;
+            $protocols = yourls_apply_filter( 'esc_url_protocols', $yourls_allowedprotocols );
+            // Note: $yourls_allowedprotocols is also globally filterable in functions-kses.php/yourls_kses_init()
+        }
 
-	if ( !yourls_is_allowed_protocol( $url, $protocols ) )
-		return '';
+        if ( !yourls_is_allowed_protocol( $url, $protocols ) )
+            return '';
 
-	// I didn't use KSES function kses_bad_protocol() because it doesn't work the way I liked (returns //blah from illegal://blah)
+        // I didn't use KSES function kses_bad_protocol() because it doesn't work the way I liked (returns //blah from illegal://blah)
+    }
 
 	return yourls_apply_filter( 'esc_url', $url, $original_url, $context );
 }
 
 
 /**
- * Lowercase scheme and domain of an URI - see issues 591, 1630, 1889
+ * Normalize a URI : lowercase scheme and domain, convert IDN to UTF8
+ *
+ * All in one example: 'HTTP://XN--mgbuq0c.Com/AbCd' -> 'http://طارق.com/AbCd'
+ * See issues 591, 1630, 1889, 2691
  *
  * This function is trickier than what seems to be needed at first
  *
@@ -539,13 +578,13 @@ function yourls_esc_url( $url, $context = 'display', $protocols = array() ) {
  * The general rule is that the scheme ("stuff://" or "stuff:") is case insensitive and should be lowercase. But then, depending on the
  * scheme, parts of what follows the scheme may or may not be case sensitive.
  *
- * Second, simply using parse_url() and its opposite http_build_url() (see functions-compat.php) is a pretty unsafe process:
+ * Second, simply using parse_url() and its opposite http_build_url() is a pretty unsafe process:
  *  - parse_url() can easily trip up on malformed or weird URLs
  *  - exploding a URL with parse_url(), lowercasing some stuff, and glueing things back with http_build_url() does not handle well
  *    "stuff:"-like URI [1] and can result in URLs ending modified [2][3]. We don't want to *validate* URI, we just want to lowercase
  *    what is supposed to be lowercased.
  *
- * So, to be conservative, this functions:
+ * So, to be conservative, this function:
  *  - lowercases the scheme
  *  - does not lowercase anything else on "stuff:" URI
  *  - tries to lowercase only scheme and domain of "stuff://" URI
@@ -558,7 +597,7 @@ function yourls_esc_url( $url, $context = 'display', $protocols = array() ) {
  * @param string $url URL
  * @return string URL with lowercase scheme and protocol
  */
-function yourls_lowercase_scheme_domain( $url ) {
+function yourls_normalize_uri( $url ) {
     $scheme = yourls_get_protocol( $url );
 
     if ('' == $scheme) {
@@ -592,9 +631,14 @@ function yourls_lowercase_scheme_domain( $url ) {
     $lower = array();
     $lower['scheme'] = strtolower( $parts['scheme'] );
     if( isset( $parts['host'] ) ) {
-        $lower['host'] = strtolower( $parts['host'] );
-    } else {
-        $parts['host'] = '***';
+        // Convert domain to lowercase, with mb_ to preserve UTF8
+        $lower['host'] = mb_strtolower($parts['host']);
+        /**
+         * Convert IDN domains to their UTF8 form so that طارق.net and xn--mgbuq0c.net
+         * are considered the same. Explicitely mention option and variant to avoid notice
+         * on PHP 7.2 and 7.3
+         */
+         $lower['host'] = idn_to_utf8($lower['host'], IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
     }
 
     $url = http_build_url($url, $lower);
@@ -637,40 +681,16 @@ function yourls_esc_textarea( $text ) {
 	return yourls_apply_filter( 'esc_textarea', $safe_text, $text );
 }
 
-
-/**
-* PHP emulation of JS's encodeURI
-*
-* @link https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/encodeURI
-* @param $url
-* @return string
-*/
-function yourls_encodeURI( $url ) {
-	// Decode URL all the way
-	$result = yourls_rawurldecode_while_encoded( $url );
-	// Encode once
-	$result = strtr( rawurlencode( $result ), array (
-        '%3B' => ';', '%2C' => ',', '%2F' => '/', '%3F' => '?', '%3A' => ':', '%40' => '@',
-		'%26' => '&', '%3D' => '=', '%2B' => '+', '%24' => '$', '%21' => '!', '%2A' => '*',
-		'%27' => '\'', '%28' => '(', '%29' => ')', '%23' => '#',
-    ) );
-	// @TODO:
-	// Known limit: this will most likely break IDN URLs such as http://www.académie-française.fr/
-	// To fully support IDN URLs, advocate use of a plugin.
-	return yourls_apply_filter( 'encodeURI', $result, $url );
-}
-
 /**
  * Adds backslashes before letters and before a number at the start of a string. Stolen from WP.
  *
  * @since 1.6
- *
  * @param string $string Value to which backslashes will be added.
  * @return string String with backslashes inserted.
  */
 function yourls_backslashit($string) {
-    $string = preg_replace('/^([0-9])/', '\\\\\\\\\1', $string);
-    $string = preg_replace('/([a-z])/i', '\\\\\1', $string);
+    $string = preg_replace('/^([0-9])/', '\\\\\\\\\1', (string)$string);
+    $string = preg_replace('/([a-z])/i', '\\\\\1', (string)$string);
     return $string;
 }
 
@@ -717,4 +737,62 @@ function yourls_rawurldecode_while_encoded( $string ) {
 function yourls_make_bookmarklet( $code ) {
     $book = new \Ozh\Bookmarkletgen\Bookmarkletgen;
     return $book->crunch( $code );
+}
+
+/**
+ * Return a timestamp, plus or minus the time offset if defined
+ *
+ * @since 1.7.10
+ * @param  string|int $timestamp  a timestamp
+ * @return int                    a timestamp, plus or minus offset if defined
+ */
+function yourls_get_timestamp( $timestamp ) {
+    $offset = yourls_get_time_offset();
+    $timestamp_offset = (int)$timestamp + ($offset * 3600);
+
+    return yourls_apply_filter( 'get_timestamp', $timestamp_offset, $timestamp, $offset );
+}
+
+/**
+ * Get time offset, as defined in config, filtered
+ *
+ * @since 1.7.10
+ * @return int       Time offset
+ */
+function yourls_get_time_offset() {
+    $offset = defined('YOURLS_HOURS_OFFSET') ? (int)YOURLS_HOURS_OFFSET : 0;
+    return yourls_apply_filter( 'get_time_offset', $offset );
+}
+
+/**
+ * Return a date() format for a full date + time, filtered
+ *
+ * @since 1.7.10
+ * @param  string $format  Date format string
+ * @return string          Date format string
+ */
+function yourls_get_datetime_format( $format ) {
+    return yourls_apply_filter( 'get_datetime_format', (string)$format );
+}
+
+/**
+ * Return a date() format for date (no time), filtered
+ *
+ * @since 1.7.10
+ * @param  string $format  Date format string
+ * @return string          Date format string
+ */
+function yourls_get_date_format( $format ) {
+    return yourls_apply_filter( 'get_date_format', (string)$format );
+}
+
+/**
+ * Return a date() format for a time (no date), filtered
+ *
+ * @since 1.7.10
+ * @param  string $format  Date format string
+ * @return string          Date format string
+ */
+function yourls_get_time_format( $format ) {
+    return yourls_apply_filter( 'get_time_format', (string)$format );
 }

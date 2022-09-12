@@ -13,8 +13,9 @@
 
 namespace YOURLS\Database;
 
-use YOURLS\Admin\Logger;
-use Aura\Sql\ExtendedPdo;
+use \Aura\Sql\ExtendedPdo;
+use \YOURLS\Database\Profiler;
+use \YOURLS\Database\Logger;
 use PDO;
 
 class YDB extends ExtendedPdo {
@@ -37,7 +38,7 @@ class YDB extends ExtendedPdo {
      * @var array
      *
      */
-    protected $infos = array();
+    protected $infos = [];
 
     /**
      * Is YOURLS installed and ready to run?
@@ -49,19 +50,19 @@ class YDB extends ExtendedPdo {
      * Options
      * @var array
      */
-    protected $option = array();
+    protected $option = [];
 
     /**
      * Plugin admin pages informations
      * @var array
      */
-    protected $plugin_pages = array();
+    protected $plugin_pages = [];
 
     /**
      * Plugin informations
      * @var array
      */
-    protected $plugins = array();
+    protected $plugins = [];
 
     /**
      * Are we emulating prepare statements ?
@@ -172,16 +173,26 @@ class YDB extends ExtendedPdo {
      * Start a Message Logger
      *
      * @since  1.7.3
-     * @see    \YOURLS\Admin\Logger
-     * @see    \Aura\Sql\Profiler
+     * @see    \Aura\Sql\Profiler\Profiler
+     * @see    \Aura\Sql\Profiler\MemoryLogger
      * @return void
      */
     public function start_profiler() {
-        $this->profiler = new Logger($this);
+        // Instantiate a custom logger and make it the profiler
+        $yourls_logger = new Logger();
+        $profiler = new Profiler($yourls_logger);
+        $this->setProfiler($profiler);
+
+        /* By default, make "query" the log level. This way, each internal logging triggered
+         * by Aura SQL will be a "query", and logging triggered by yourls_debug() will be
+         * a "message". See includes/functions-debug.php:yourls_debug()
+         */
+        $profiler->setLoglevel('query');
     }
 
     /**
      * @param string $context
+     * @return void
      */
     public function set_html_context($context) {
         $this->context = $context;
@@ -199,6 +210,7 @@ class YDB extends ExtendedPdo {
     /**
      * @param string $name
      * @param mixed  $value
+     * @return void
      */
     public function set_option($name, $value) {
         $this->option[$name] = $value;
@@ -222,6 +234,7 @@ class YDB extends ExtendedPdo {
 
     /**
      * @param string $name
+     * @return void
      */
     public function delete_option($name) {
         unset($this->option[$name]);
@@ -233,6 +246,7 @@ class YDB extends ExtendedPdo {
     /**
      * @param string $keyword
      * @param mixed  $infos
+     * @return void
      */
     public function set_infos($keyword, $infos) {
         $this->infos[$keyword] = $infos;
@@ -256,6 +270,7 @@ class YDB extends ExtendedPdo {
 
     /**
      * @param string $keyword
+     * @return void
      */
     public function delete_infos($keyword) {
         unset($this->infos[$keyword]);
@@ -277,6 +292,7 @@ class YDB extends ExtendedPdo {
 
     /**
      * @param array $plugins
+     * @return void
      */
     public function set_plugins(array $plugins) {
         $this->plugins = $plugins;
@@ -284,6 +300,7 @@ class YDB extends ExtendedPdo {
 
     /**
      * @param string $plugin  plugin filename
+     * @return void
      */
     public function add_plugin($plugin) {
         $this->plugins[] = $plugin;
@@ -291,6 +308,7 @@ class YDB extends ExtendedPdo {
 
     /**
      * @param string $plugin  plugin filename
+     * @return void
      */
     public function remove_plugin($plugin) {
         unset($this->plugins[$plugin]);
@@ -303,11 +321,12 @@ class YDB extends ExtendedPdo {
      * @return array
      */
     public function get_plugin_pages() {
-        return $this->plugin_pages;
+        return is_array( $this->plugin_pages ) ? $this->plugin_pages : [];
     }
 
     /**
      * @param array $pages
+     * @return void
      */
     public function set_plugin_pages(array $pages) {
         $this->plugin_pages = $pages;
@@ -317,20 +336,22 @@ class YDB extends ExtendedPdo {
      * @param string   $slug
      * @param string   $title
      * @param callable $function
+     * @return void
      */
-    public function add_plugin_page($slug, $title, $function) {
-        $this->plugin_pages[$slug] = array(
+    public function add_plugin_page( $slug, $title, $function ) {
+        $this->plugin_pages[ $slug ] = [
             'slug'     => $slug,
             'title'    => $title,
             'function' => $function,
-        );
+        ];
     }
 
     /**
      * @param string $slug
+     * @return void
      */
-    public function remove_plugin_page($slug) {
-        unset($this->plugin_pages[$slug]);
+    public function remove_plugin_page( $slug ) {
+        unset( $this->plugin_pages[ $slug ] );
     }
 
 
@@ -347,42 +368,14 @@ class YDB extends ExtendedPdo {
     /**
      * Return SQL queries performed
      *
-     * Aura\Sql\Profiler logs every PDO command issued. But depending on PDO::ATTR_EMULATE_PREPARES, some are
-     * actually sent to the mysql server or not :
-     *  - if PDO::ATTR_EMULATE_PREPARES is true, prepare() statements are not sent to the server and are performed
-     *    internally, so they are removed from the logger
-     *  - if PDO::ATTR_EMULATE_PREPARES is false, prepare() statements are actually performed by the mysql server,
-     *    and count as an actual query
-     *
-     * Resulting array is something like:
-     *   array (
-     *      0 => array (
-     *           'duration' => 1.0010569095611572265625,
-     *           'function' => 'connect',
-     *           'statement' => NULL,
-     *           'bind_values' => array (),
-     *           'trace' => ...back trace...,
-     *       ),
-     *       // key index might not be sequential if 'prepare' function are filtered out
-     *       2 => array (
-     *           'duration' => 0.000999927520751953125,
-     *           'function' => 'perform',
-     *           'statement' => 'SELECT option_value FROM yourls_options WHERE option_name = :option_name LIMIT 1',
-     *           'bind_values' => array ( 'option_name' => 'test_option' ),
-     *           'trace' => ...back trace...,
-     *       ),
-     *   );
-     *
      * @since  1.7.3
      * @return array
      */
     public function get_queries() {
-        $queries = $this->getProfiler()->getProfiles();
+        $queries = $this->getProfiler()->getLogger()->getMessages();
 
-        if ($this->get_emulate_state()) {
-            // keep queries if $query['function'] != 'prepare'
-            $queries = array_filter($queries, function($query) {return $query['function'] !== 'prepare';});
-        }
+        // Only keep messages that start with "SQL "
+        $queries = array_filter($queries, function($query) {return substr( $query, 0, 4 ) === "SQL ";});
 
         return $queries;
     }
@@ -427,59 +420,4 @@ class YDB extends ExtendedPdo {
         return $version;
     }
 
-    /**
-     * Deprecated properties since 1.7.3, unused in 3rd party plugins as far as I know
-     *
-     * $ydb->DB_driver
-     * $ydb->captured_errors
-     * $ydb->dbh
-     * $ydb->result
-     * $ydb->rows_affected
-     * $ydb->show_errors
-     */
-
-    /**
-     * Deprecated functions since 1.7.3
-     */
-
-    // @codeCoverageIgnoreStart
-
-    public function escape($string) {
-        yourls_deprecated_function( '$ydb->'.__FUNCTION__, '1.7.3', 'PDO' );
-        // This will escape using PDO->quote(), but then remove the enclosing quotes
-        return substr($this->quote($string), 1, -1);
-    }
-
-    public function get_col($query) {
-        yourls_deprecated_function( '$ydb->'.__FUNCTION__, '1.7.3', 'PDO' );
-        yourls_debug_log('LEGACY SQL: '.$query);
-        return $this->fetchCol($query);
-    }
-
-    public function get_results($query) {
-        yourls_deprecated_function( '$ydb->'.__FUNCTION__, '1.7.3', 'PDO' );
-        yourls_debug_log('LEGACY SQL: '.$query);
-        $stm = parent::query($query);
-        return($stm->fetchAll(PDO::FETCH_OBJ));
-    }
-
-    public function get_row($query) {
-        yourls_deprecated_function( '$ydb->'.__FUNCTION__, '1.7.3', 'PDO' );
-        yourls_debug_log('LEGACY SQL: '.$query);
-        $row = $this->fetchObjects($query);
-        return isset($row[0]) ? $row[0] : null;
-    }
-
-    public function get_var($query) {
-        yourls_deprecated_function( '$ydb->'.__FUNCTION__, '1.7.3', 'PDO' );
-        yourls_debug_log('LEGACY SQL: '.$query);
-        return $this->fetchValue($query);
-    }
-
-    public function query($query) {
-        yourls_deprecated_function( '$ydb->'.__FUNCTION__, '1.7.3', 'PDO' );
-        yourls_debug_log('LEGACY SQL: '.$query);
-        return $this->fetchAffected($query);
-    }
-    // @codeCoverageIgnoreEnd
 }

@@ -4,19 +4,22 @@
  * Connect to DB
  *
  * @since 1.0
+ * @return \YOURLS\Database\YDB
  */
 function yourls_db_connect() {
-	global $ydb;
+    global $ydb;
 
-	if (   !defined( 'YOURLS_DB_USER' )
-		or !defined( 'YOURLS_DB_PASS' )
-		or !defined( 'YOURLS_DB_NAME' )
-		or !defined( 'YOURLS_DB_HOST' )
-	) yourls_die ( yourls__( 'Incorrect DB config, or could not connect to DB' ), yourls__( 'Fatal error' ), 503 );
+    if ( !defined( 'YOURLS_DB_USER' )
+         or !defined( 'YOURLS_DB_PASS' )
+         or !defined( 'YOURLS_DB_NAME' )
+         or !defined( 'YOURLS_DB_HOST' )
+    ) {
+        yourls_die( yourls__( 'Incorrect DB config, please refer to documentation' ), yourls__( 'Fatal error' ), 503 );
+    }
 
     $dbhost = YOURLS_DB_HOST;
-    $user   = YOURLS_DB_USER;
-    $pass   = YOURLS_DB_PASS;
+    $user = YOURLS_DB_USER;
+    $pass = YOURLS_DB_PASS;
     $dbname = YOURLS_DB_NAME;
 
     // This action is deprecated
@@ -28,7 +31,7 @@ function yourls_db_connect() {
         $dbhost = sprintf( '%1$s;port=%2$d', $dbhost, $dbport );
     }
 
-    $charset = yourls_apply_filter( 'db_connect_charset', 'utf8' );
+    $charset = yourls_apply_filter( 'db_connect_charset', 'utf8mb4' );
 
     /**
      * Data Source Name (dsn) used to connect the DB
@@ -43,22 +46,70 @@ function yourls_db_connect() {
 
     /**
      * PDO driver options and attributes
-
+     *
      * The PDO constructor is something like:
      *   new PDO( string $dsn, string $username, string $password [, array $options ] )
      * The driver options are passed to the PDO constructor, eg array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION)
      * The attribute options are then set in a foreach($attr as $k=>$v){$db->setAttribute($k, $v)} loop
      */
-    $driver_options = yourls_apply_filter( 'db_connect_driver_option', array() ); // driver options as key-value pairs
-    $attributes     = yourls_apply_filter( 'db_connect_attributes',    array() ); // attributes as key-value pairs
+    $driver_options = yourls_apply_filter( 'db_connect_driver_option', [] ); // driver options as key-value pairs
+    $attributes = yourls_apply_filter( 'db_connect_attributes', [] ); // attributes as key-value pairs
 
     $ydb = new \YOURLS\Database\YDB( $dsn, $user, $pass, $driver_options, $attributes );
     $ydb->init();
 
     // Past this point, we're connected
-    yourls_debug_log(sprintf('Connected to database %s on %s ', $dbname, $dbhost));
+    yourls_debug_log( sprintf( 'Connected to database %s on %s ', $dbname, $dbhost ) );
 
-    yourls_debug_mode(YOURLS_DEBUG);
+    yourls_debug_mode( YOURLS_DEBUG );
 
-	return $ydb;
+    return $ydb;
+}
+
+/**
+ * Helper function : return instance of the DB
+ *
+ * Instead of:
+ *     global $ydb;
+ *     $ydb->do_stuff()
+ * Prefer :
+ *     yourls_get_db()->do_stuff()
+ *
+ * @since  1.7.10
+ * @return \YOURLS\Database\YDB
+ */
+function yourls_get_db() {
+    // Allow plugins to short-circuit the whole function
+    $pre = yourls_apply_filter( 'shunt_get_db', false );
+    if ( false !== $pre ) {
+        return $pre;
+    }
+
+    global $ydb;
+    $ydb = ( isset( $ydb ) ) ? $ydb : yourls_db_connect();
+    return yourls_apply_filter('get_db', $ydb);
+}
+
+/**
+ * Helper function : set instance of DB, or unset it
+ *
+ * Instead of:
+ *     global $ydb;
+ *     $ydb = stuff
+ * Prefer :
+ *     yourls_set_db( stuff )
+ * (This is mostly used in the test suite)
+ *
+ * @since 1.7.10
+ * @param  mixed $db    Either a \YOURLS\Database\YDB instance, or anything. If null, the function will unset $ydb
+ * @return void
+ */
+function yourls_set_db($db) {
+    global $ydb;
+
+    if (is_null($db)) {
+        unset($ydb);
+    } else {
+        $ydb = $db;
+    }
 }

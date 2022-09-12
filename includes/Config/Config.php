@@ -11,20 +11,20 @@ use YOURLS\Exceptions\ConfigException;
 class Config {
 
     /**
-     * @param string
+     * @var string
      */
     protected $root;
 
     /**
-     * @param mixed
+     * @var string
      */
     protected $config;
 
     /**
      * @since  1.7.3
-     * @param  mixed $config   Optional user defined config path
+     * @param  string $config   Optional user defined config path
      */
-    public function __construct($config = false) {
+    public function __construct($config = '') {
         $this->set_root( $this->fix_win32_path( dirname( dirname( __DIR__ ) ) ) );
         $this->set_config($config);
     }
@@ -42,7 +42,7 @@ class Config {
 
     /**
      * @since  1.7.3
-     * @param  string  path to config file
+     * @param  string $config   path to config file
      * @return void
      */
     public function set_config($config) {
@@ -51,7 +51,7 @@ class Config {
 
     /**
      * @since  1.7.3
-     * @param  string  path to YOURLS root directory
+     * @param  string $root   path to YOURLS root directory
      * @return void
      */
     public function set_root($root) {
@@ -131,7 +131,7 @@ class Config {
 
         // URL of user directory
         if (!defined( 'YOURLS_USERURL' ))
-            define( 'YOURLS_USERURL', YOURLS_SITE.'/user' );
+            define( 'YOURLS_USERURL', trim(YOURLS_SITE, '/').'/user' );
 
         // physical path of asset directory
         if( !defined( 'YOURLS_ASSETDIR' ) )
@@ -139,7 +139,7 @@ class Config {
 
         // URL of asset directory
         if( !defined( 'YOURLS_ASSETURL' ) )
-            define( 'YOURLS_ASSETURL', YOURLS_SITE.'/assets' );
+            define( 'YOURLS_ASSETURL', trim(YOURLS_SITE, '/').'/assets' );
 
         // physical path of translations directory
         if (!defined( 'YOURLS_LANG_DIR' ))
@@ -163,7 +163,7 @@ class Config {
 
         // physical path of pages directory
         if (!defined( 'YOURLS_PAGEDIR' ))
-            define('YOURLS_PAGEDIR', YOURLS_ABSPATH.'/pages' );
+            define('YOURLS_PAGEDIR', YOURLS_USERDIR.'/pages' );
 
         // table to store URLs
         if (!defined( 'YOURLS_DB_TABLE_URL' ))
